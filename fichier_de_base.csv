@@ -1,0 +1,8 @@
+Prenom,Nom,DisplayName,SamAccountName,UserPrincipalName,UO,GroupesUtilisateurs,GGVersDL
+Alice,Durand,Alice Durand,ALICE.DURAND,alice.durand@test.lan,COMPTA,GG-COMPTA,GG-COMPTA=>DL-COMPTA-RW
+Bruno,Lemoine,Bruno Lemoine,BRUNO.LEMOINE,bruno.lemoine@test.lan,COMPTA,GG-COMPTA,GG-COMPTA=>DL-COMPTA-RW
+Claire,Morel,Claire Morel,CLAIRE.MOREL,claire.morel@test.lan,COMPTA,GG-COMPTA,GG-COMPTA=>DL-COMPTA-RW
+David,Bernard,David Bernard,DAVID.BERNARD,david.bernard@test.lan,IT,GG-IT,GG-IT=>DL-IT-RW
+Eva,Martin,Eva Martin,EVA.MARTIN,eva.martin@test.lan,DIRECTION,GG-DIRECTION,GG-DIRECTION=>DL-DIRECTION-RW
+Franck,Lopez,Franck Lopez,FRANCK.LOPEZ,franck.lopez@test.lan,DIRECTION,GG-DIRECTION,GG-DIRECTION=>DL-DIRECTION-RW
+Gaelle,Petit,Gaelle Petit,GAELLE.PETIT,gaelle.petit@test.lan,DIRECTION,GG-DIRECTION,GG-DIRECTION=>DL-DIRECTION-RW
