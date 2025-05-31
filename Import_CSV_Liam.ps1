@@ -1,111 +1,159 @@
+CLEAR-HOST
 
-Clear-Host
-
-# CHARGEMENT DU MODULE ActiveDirectory
-if (-not (Get-Module -Name ActiveDirectory)) {
-    try {
-        Import-Module ActiveDirectory -ErrorAction Stop
-    } catch {
-        Write-Host "ERREUR : MODULE ActiveDirectory NON DISPONIBLE" -ForegroundColor Red
-        exit
-    }
+# ==============================
+# FONCTION 1 : ACTIVER BUREAU A DISTANCE (registre + pare-feu)
+# ==============================
+FUNCTION ACTIVER-RDP {
+    WRITE-HOST "`nACTIVATION DU BUREAU A DISTANCE..." -FOREGROUNDCOLOR CYAN
+    SET-ITEMPROPERTY -PATH "HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server" -NAME "fDenyTSConnections" -VALUE 0
+    ENABLE-NETFIREWALLRULE -DISPLAYGROUP "Bureau a distance"
+    WRITE-HOST "RDP ACTIVE + PARE-FEU CONFIGURE." -FOREGROUNDCOLOR GREEN
+    PAUSE
 }
 
-$domainDN = (Get-ADDomain).DistinguishedName
-$domainName = ($domainDN -replace 'DC=', '') -replace ',', '.'
-
-# CREATION DE L'UO PRINCIPALE
-$uoPrincipale = "SIEGE"
-$uoPrincipaleDN = "OU=$uoPrincipale,$domainDN"
-if (-not (Get-ADOrganizationalUnit -LDAPFilter "(distinguishedName=$uoPrincipaleDN)" -ErrorAction SilentlyContinue)) {
-    New-ADOrganizationalUnit -Name $uoPrincipale -Path $domainDN -ProtectedFromAccidentalDeletion $true -Verbose
-}
-
-# CREATION DES UO SECONDAIRES
-$uoSecondaires = @("COMPTA", "IT", "DIRECTION", "DL")
-foreach ($uo in $uoSecondaires) {
-    $path = "OU=$uo,OU=$uoPrincipale,$domainDN"
-    if (-not (Get-ADOrganizationalUnit -LDAPFilter "(distinguishedName=$path)" -ErrorAction SilentlyContinue)) {
-        New-ADOrganizationalUnit -Name $uo -Path $uoPrincipaleDN -ProtectedFromAccidentalDeletion $true -Verbose
-    }
-}
-
-# CHEMIN DU CSV
-$csvPath = Read-Host "ENTREZ LE CHEMIN COMPLET DU FICHIER CSV"
-if (-not (Test-Path $csvPath)) {
-    Write-Host "FICHIER INTROUVABLE : $csvPath" -ForegroundColor Red
-    exit
-}
-
-$csvUsers = Import-Csv $csvPath
-
-foreach ($ligne in $csvUsers) {
-    $prenom = $ligne.Prenom.Trim()
-    $nom = $ligne.Nom.Trim()
-    $display = $ligne.DisplayName.Trim()
-    $sam = $ligne.SamAccountName.Trim().ToLower()
-    $upn = $ligne.UserPrincipalName.Trim().ToLower()
-    $uo = $ligne.UO.Trim().ToUpper()
-    $groupesUtilisateurs = $ligne.GroupesUtilisateurs
-    $relationsGGversDL = $ligne.GGVersDL
-
-    $userOU = "OU=$uo,OU=$uoPrincipale,$domainDN"
-
-    if (-not (Get-ADOrganizationalUnit -LDAPFilter "(distinguishedName=$userOU)" -ErrorAction SilentlyContinue)) {
-        New-ADOrganizationalUnit -Name $uo -Path $uoPrincipaleDN -ProtectedFromAccidentalDeletion $true -Verbose
+# ==============================
+# FONCTION 2 : IMPORT UTILISATEURS CSV
+# ==============================
+FUNCTION IMPORT-UTILISATEURS {
+    IF (-NOT (GET-MODULE -NAME ACTIVEDIRECTORY)) {
+        TRY {
+            IMPORT-MODULE ACTIVEDIRECTORY -ERRORACTION STOP
+        } CATCH {
+            WRITE-HOST "ERREUR : MODULE ACTIVEDIRECTORY NON DISPONIBLE" -FOREGROUNDCOLOR RED
+            RETURN
+        }
     }
 
-    $userParams = @{
-        Name               = $display
-        GivenName          = $prenom
-        Surname            = $nom
-        SamAccountName     = $sam
-        UserPrincipalName  = $upn
-        Path               = $userOU
-        AccountPassword    = (ConvertTo-SecureString "Ertyuiop," -AsPlainText -Force)
-        Enabled            = $true
+    $DOMAINDN = (GET-ADDOMAIN).DISTINGUISHEDNAME
+    $UOPRINCIPALE = "SIEGE"
+    $UOPRINCIPALEDN = "OU=$UOPRINCIPALE,$DOMAINDN"
+    $UOSECONDAIRES = @("COMPTA", "IT", "DIRECTION", "DL")
+
+    IF (-NOT (GET-ADORGANIZATIONALUNIT -LDAPFILTER "(distinguishedName=$UOPRINCIPALEDN)" -ERRORACTION SILENTLYCONTINUE)) {
+        NEW-ADORGANIZATIONALUNIT -NAME $UOPRINCIPALE -PATH $DOMAINDN -PROTECTEDFROMACCIDENTALDELETION $TRUE -VERBOSE
     }
 
-    New-ADUser @userParams -Verbose
+    FOREACH ($UO IN $UOSECONDAIRES) {
+        $PATH = "OU=$UO,OU=$UOPRINCIPALE,$DOMAINDN"
+        IF (-NOT (GET-ADORGANIZATIONALUNIT -LDAPFILTER "(distinguishedName=$PATH)" -ERRORACTION SILENTLYCONTINUE)) {
+            NEW-ADORGANIZATIONALUNIT -NAME $UO -PATH $UOPRINCIPALEDN -PROTECTEDFROMACCIDENTALDELETION $TRUE -VERBOSE
+        }
+    }
 
-    if ($groupesUtilisateurs) {
-        $groupes = $groupesUtilisateurs -split '[;,]'
-        foreach ($gg in $groupes) {
-            $gg = $gg.Trim()
-            $ggPath = $userOU
+    $CSVPATH = READ-HOST "ENTREZ LE CHEMIN COMPLET DU FICHIER CSV"
+    IF (-NOT (TEST-PATH $CSVPATH)) {
+        WRITE-HOST "FICHIER INTROUVABLE : $CSVPATH" -FOREGROUNDCOLOR RED
+        RETURN
+    }
 
-            if (-not (Get-ADGroup -Filter "Name -eq '$gg'" -SearchBase $ggPath -ErrorAction SilentlyContinue)) {
-                New-ADGroup -Name $gg -GroupScope Global -GroupCategory Security -Path $ggPath -Verbose
+    $CSVUSERS = IMPORT-CSV $CSVPATH
+
+    FOREACH ($LIGNE IN $CSVUSERS) {
+        $PRENOM = $LIGNE.PRENOM.TRIM()
+        $NOM = $LIGNE.NOM.TRIM()
+        $DISPLAY = $LIGNE.DISPLAYNAME.TRIM()
+        $SAM = $LIGNE.SAMACCOUNTNAME.TRIM().TOLOWER()
+        $UPN = $LIGNE.USERPRINCIPALNAME.TRIM().TOLOWER()
+        $UO = $LIGNE.UO.TRIM().TOUPPER()
+        $GROUPESUTILISATEURS = $LIGNE.GROUPESUTILISATEURS
+        $RELATIONSGGVERSDL = $LIGNE.GGVERSDL
+
+        $USEROU = "OU=$UO,OU=$UOPRINCIPALE,$DOMAINDN"
+
+        IF (-NOT (GET-ADORGANIZATIONALUNIT -LDAPFILTER "(distinguishedName=$USEROU)" -ERRORACTION SILENTLYCONTINUE)) {
+            NEW-ADORGANIZATIONALUNIT -NAME $UO -PATH $UOPRINCIPALEDN -PROTECTEDFROMACCIDENTALDELETION $TRUE -VERBOSE
+        }
+
+        $USERPARAMS = @{
+            NAME              = $DISPLAY
+            GIVENNAME         = $PRENOM
+            SURNAME           = $NOM
+            SAMACCOUNTNAME    = $SAM
+            USERPRINCIPALNAME = $UPN
+            PATH              = $USEROU
+            ACCOUNTPASSWORD   = (CONVERTTO-SECURESTRING "Ertyuiop," -ASPLAINTEXT -FORCE)
+            ENABLED           = $TRUE
+        }
+
+        NEW-ADUSER @USERPARAMS -VERBOSE
+
+        IF ($GROUPESUTILISATEURS) {
+            $GROUPES = $GROUPESUTILISATEURS -SPLIT '[;,]'
+            FOREACH ($GG IN $GROUPES) {
+                $GG = $GG.TRIM()
+                $GGPATH = $USEROU
+                IF (-NOT (GET-ADGROUP -FILTER "NAME -EQ '$GG'" -SEARCHBASE $GGPATH -ERRORACTION SILENTLYCONTINUE)) {
+                    NEW-ADGROUP -NAME $GG -GROUPSCOPE GLOBAL -GROUPCATEGORY SECURITY -PATH $GGPATH -VERBOSE
+                }
+                TRY {
+                    ADD-ADGROUPMEMBER -IDENTITY $GG -MEMBERS $SAM -VERBOSE
+                } CATCH {
+                    WRITE-HOST "ERREUR AJOUT $SAM DANS $GG" -FOREGROUNDCOLOR RED
+                }
             }
+        }
 
-            try {
-                Add-ADGroupMember -Identity $gg -Members $sam -Verbose
-            } catch {
-                Write-Host "⚠️ ERREUR AJOUT $sam DANS $gg" -ForegroundColor Red
+        IF ($RELATIONSGGVERSDL) {
+            $LIAISONS = $RELATIONSGGVERSDL -SPLIT '[;,]'
+            FOREACH ($LIAISON IN $LIAISONS) {
+                IF ($LIAISON -MATCH "^(.*?)=>(.*?)$") {
+                    $GG = $MATCHES[1].TRIM()
+                    $DL = $MATCHES[2].TRIM()
+                    $DLPATH = "OU=DL,OU=$UOPRINCIPALE,$DOMAINDN"
+                    IF (-NOT (GET-ADGROUP -FILTER "NAME -EQ '$DL'" -SEARCHBASE $DLPATH -ERRORACTION SILENTLYCONTINUE)) {
+                        NEW-ADGROUP -NAME $DL -GROUPSCOPE DOMAINLOCAL -GROUPCATEGORY SECURITY -PATH $DLPATH -VERBOSE
+                    }
+                    TRY {
+                        ADD-ADGROUPMEMBER -IDENTITY $DL -MEMBERS $GG -VERBOSE
+                    } CATCH {
+                        WRITE-HOST "ERREUR AJOUT $GG DANS $DL" -FOREGROUNDCOLOR RED
+                    }
+                }
             }
         }
     }
 
-    if ($relationsGGversDL) {
-        $liaisons = $relationsGGversDL -split '[;,]'
-        foreach ($liaison in $liaisons) {
-            if ($liaison -match '^(.*?)=>(.*?)$') {
-                $gg = $matches[1].Trim()
-                $dl = $matches[2].Trim()
-                $dlPath = "OU=DL,OU=$uoPrincipale,$domainDN"
-
-                if (-not (Get-ADGroup -Filter "Name -eq '$dl'" -SearchBase $dlPath -ErrorAction SilentlyContinue)) {
-                    New-ADGroup -Name $dl -GroupScope DomainLocal -GroupCategory Security -Path $dlPath -Verbose
-                }
-
-                try {
-                    Add-ADGroupMember -Identity $dl -Members $gg -Verbose
-                } catch {
-                    Write-Host "⚠️ ERREUR AJOUT $gg DANS $dl" -ForegroundColor Red
-                }
-            }
-        }
-    }
+    WRITE-HOST "`nIMPORT ET CONFIGURATION TERMINEE !" -FOREGROUNDCOLOR GREEN
+    PAUSE
 }
 
-Write-Host "`n✅ IMPORT TERMINE AVEC SUCCES !" -ForegroundColor Green
+# ==============================
+# FONCTION 3 : AJOUT DU GROUPE DOMAINE DANS LE GROUPE LOCAL RDP (SANS ACCENT)
+# ==============================
+FUNCTION AJOUTER-GROUPE-RDP {
+    WRITE-HOST "`nAJOUT DU GROUPE 'UTILISATEURS DU DOMAINE' DANS LE GROUPE LOCAL 'UTILISATEURS DU BUREAU A DISTANCE'..." -FOREGROUNDCOLOR CYAN
+    TRY {
+        WRITE-HOST "GROUP LOCAL = [Utilisateurs du Bureau a distance]"
+        WRITE-HOST "GROUP DOMAINE = [TEST/Utilisateurs du domaine]"
+        $group = [ADSI]"WinNT://$env:COMPUTERNAME/Utilisateurs du Bureau a distance,group"
+        $group.Add("WinNT://TEST/Utilisateurs du domaine")
+        WRITE-HOST "UTILISATEURS DU DOMAINE AJOUTE AU GROUPE LOCAL RDP." -FOREGROUNDCOLOR GREEN
+    } CATCH {
+        WRITE-HOST "ERREUR LORS DE L'AJOUT : $_" -FOREGROUNDCOLOR RED
+    }
+    PAUSE
+}
+
+# ==============================
+# MENU PRINCIPAL
+# ==============================
+DO {
+    CLEAR-HOST
+    WRITE-HOST "=============================" -FOREGROUNDCOLOR YELLOW
+    WRITE-HOST "   MENU PRINCIPAL - OUTIL AD  " -FOREGROUNDCOLOR YELLOW
+    WRITE-HOST "=============================`n" -FOREGROUNDCOLOR YELLOW
+    WRITE-HOST "1. ACTIVER LE BUREAU A DISTANCE"
+    WRITE-HOST "2. IMPORTER LES UTILISATEURS VIA CSV"
+    WRITE-HOST "3. AJOUTER UTILISATEURS DU DOMAINE AU RDP"
+    WRITE-HOST "0. QUITTER`n"
+
+    $CHOIX = READ-HOST "VOTRE CHOIX"
+
+    SWITCH ($CHOIX) {
+        "1" { ACTIVER-RDP }
+        "2" { IMPORT-UTILISATEURS }
+        "3" { AJOUTER-GROUPE-RDP }
+        "0" { EXIT }
+        DEFAULT { WRITE-HOST "CHOIX INVALIDE." -FOREGROUNDCOLOR RED; PAUSE }
+    }
+} WHILE ($TRUE)
